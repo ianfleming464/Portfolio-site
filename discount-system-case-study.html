@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Case Study · Discount Coordination Engine — Ian Fleming</title>
+  <title>Case Study · Discount Coordination Engine – Ian Fleming</title>
 
   <link rel="short icon" href="img/favicon-32x32.png" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/7.0.0/normalize.min.css"/>
@@ -24,13 +24,13 @@
   <!-- HERO -->
   <section class="case-hero">
     <div class="container">
-      <h1 class="case-title">Custom Cart Discount Coordination Engine</h1>
-      <p class="case-subtitle">Bridging Shopify’s cart/checkout logic to show trustworthy, combined discounts in the cart UI.</p>
+      <h1 class="case-title">Cart Discount Coordination Engine</h1>
+      <p class="case-subtitle">Unifying independent discount systems into a single, trustworthy cart interface.</p>
 
       <div class="case-meta">
         <span class="pill">Role: Lead Developer</span>
-        <span class="pill">Deployed to 8+ stores</span>
-        <span class="pill">Stack: JS · Liquid · Rebuy · DOM</span>
+        <span class="pill">Deployed to 8 storefronts</span>
+        <span class="pill">Stack: JS · DOM APIs · Event-Driven Architecture</span>
       </div>
     </div>
   </section>
@@ -38,80 +38,82 @@
   <!-- OVERVIEW GRID -->
   <section class="case-grid container">
     <div class="case-main">
-      <h2>Summary</h2>
+      <h2>The Problem</h2>
       <p>
-        Shopify applies <em>automatic</em> discounts at checkout and allows us to handle <em>manual</em> codes at the cart layer. The two don’t natively combine in the cart, and the line item UI does not natively update to reflect the discount, leading to confusing subtotals and lost trust. I built a modular cart-layer system that detects both, allocates discounts proportionally, renders clear per-line price changes, and derives a truthful subtotal so the cart matches checkout expectations.
+        Three independent systems (platform, third-party cart, user input) apply discounts in isolation. When systems don't communicate cleanly, users see inconsistent prices and lose trust. Example: cart displays €100, checkout shows €85—no explanation of where the €15 went.
       </p>
 
-      <div class="callout-note">
-        <i class="fas fa-lock"></i>
-        Client code is private. This case study documents architecture, approach, and redacted UI behaviour.
-      </div>
+      <p>
+        The result? High support volume from pricing confusion, abandoned carts, and eroded customer confidence.
+      </p>
 
-      <h3>The Challenge</h3>
-        <ul>
-          <li>Cart shows €100, checkout shows €85 with no explanation of the difference</li>
-          <li>Cart renders a message saying "Discount applied in checkout", but perhaps there is a clearer way to show this?</li>
-          <li>No visual feedback when quantity changes affect line item pricing</li>
-          <li>Automatic discounts completely invisible until checkout (again, "...applied in checkout")</li>
-          <li>Manual discount codes don't coordinate with automatic promotions</li>
-          <li>High support volume from pricing confusion and lost customer trust</li>
-          <li>Shopify splits/merges identical line items, breaking naïve grouping logic.</li>
-        </ul>
+      <h2>The Solution</h2>
+      <p>
+        Built a unified coordination layer that detects all discount sources simultaneously, calculates their combined impact with mathematical precision, and displays truthful prices in real-time across line items. Cart totals now match checkout—eliminating the largest category of support tickets.
+      </p>
 
-      <h3>Solution · Built in Stages</h3>
-      <ol>
-        <li><strong>Callbacks for line items</strong> – dynamic UI based on quantity/changes. Not native behaviour in all Shopify themes</li>
-        <li><strong>Free gift handler</strong> – reads MOV/code/gift from Admin; adds/removes safely and dynamically depending on cart state</li>
-        <li><strong>Manual discount code UI</strong> adds – compare-at + sale classes; transparent pricing; saves original state for ease of code removal</li>
-        <li><strong>Proportional allocation</strong> – fixed / % discounts spread across line items, so subtotal is accurate.</li>
-        <li><strong>URL discount sync</strong> – detects Shopify’s <code>discount_code</code> cookie; applies same UI updates.</li>
-        <li><strong>3-for-2 handler</strong> – cheapest eligible item goes to zero; visuals + math stay in sync. UI updates working in conjunction with native "Buy X Get Y" Shopify discount</li>
-        <li><strong>Auto-discount detection</strong> – listens for platform signals; mirrors expected checkout discounting in cart.</li>
-        <li><strong>Derived subtotal for combo scenarios</strong> – sums effective per-line sale prices; overwrites displayed subtotal with guardrails.</li>
-        <li><strong>Combination logic</strong> – manual + auto together with coherent UI and totals.</li>
-        <li><strong>Split/merge resilience</strong> – defensive regrouping; fails-safe to native display when needed.</li>
-        <li><strong>Event Manager → Coordinator (coming soon)</strong> – migrating to a single orchestrator (queue + debounce) for clean sequencing.</li>
-        <li><strong>State preservation (coming soon)</strong> – quick, safe reversion when codes/conditions change.</li>
-      </ol>
+      <h3>Key Technical Decisions</h3>
+      
+      <p><strong>State Signature Tracking</strong><br>
+      Instead of reprocessing on every cart change, I track a "signature" of the current discount + items. If nothing has changed, skip recalculation. This prevents unnecessary DOM thrashing on high-traffic carts.
+      </p>
 
-     
-      <h3>Technical Challenges</h3>
-      <p>Ensuring proportional discount allocation across mixed cart items (percentage vs. fixed amounts) while maintaining subtotal accuracy required custom mathematical distribution algorithms that consistently matched Shopify's backend calculations. Some markets required different currency formatting while maintaining unified discount logic.</p>
-      <p>Getting the cart line item UI to accurately reflect combination situations - for example, a URL-based discount is applied by Shopify at checkout level, then manually entered codes are cart level (so essentially ignored by Shopify's frontend). Getting the line item discounting to accurately calculate the correct full discount, update the subtotal - which natively ONLY shows the Shopify-applied disocounting (so the checkout-level, not checkout+cart level) and having everything reliably accurate into the checkout.</p>
-      <p>Comprehensive debugging was essential given the system's complexity across multiple platforms and discount combinations. Each module includes extensive debug logging that can be enabled via browser console commands (<code>window.CartCallbacks.debug(true)</code>), providing real-time visibility into state changes, allocation calculations, and UI updates. This proved invaluable for troubleshooting edge cases and performance optimization across different international deployments.</p>
+      <p><strong>Proportional Allocation with Rounding Reconciliation</strong><br>
+      When applying a discount across multiple items, naive rounding causes €0.01 discrepancies. Implemented a two-pass algorithm: first allocate proportionally, then reconcile remainders to ensure the total always matches expectations exactly.
+      </p>
 
-      <h3>Architecture (high level)</h3>
+      <p><strong>Platform-Aware Mode Detection</strong><br>
+      Discovered that automatic discounts and URL-based discounts are managed differently by the platform. Rather than fight this, I built the system to detect which mode is active and defer to the platform when appropriate—only applying custom logic for manual codes. This means working <em>with</em> platform constraints rather than against them.
+      </p>
+
+      <p><strong>Multi-Mode Combination Handling</strong><br>
+      Recently added dynamic multiples support (3-for-2, 4-for-3 patterns). The tricky part: when customers combine a multiples code with a percentage discount, we need to calculate which items are free vs. discounted, then allocate the percentage across only the paid items. System now detects this scenario and handles it correctly.
+      </p>
+
+      <h3>Architecture (High Level)</h3>
       <ul class="bullets-tight">
-        <li><code>callbacks/</code> – DOM mutations for price/badge/subtotal.</li>
-        <li><code>handlers/</code> – free gifts, 3-for-2, code presence, auto-discount signals.</li>
-        <li><code>utils/</code> – logging, cookies, debouncing, selectors, currency.</li>
-        <li><code>eventManager</code> → <code>discountCoordinator</code> – orchestrate updates deterministically.</li>
+        <li><strong>Discount Detection:</strong> Polls for active codes and automatic discounts</li>
+        <li><strong>Allocation Engine:</strong> Calculates proportional distributions with precision</li>
+        <li><strong>DOM Renderer:</strong> Updates line-item prices with proper formatting</li>
+        <li><strong>State Manager:</strong> Tracks original prices and current state</li>
+        <li><strong>Combination Handler:</strong> Manages multi-discount scenarios (multiples + percentage, etc.)</li>
       </ul>
-        <p>The upcoming DiscountCoordinator will replace the current event manager's broadcast approach with intelligent orchestration. Instead of multiple handlers reacting simultaneously to cart events, the Coordinator will analyze discount state first, then decide which handlers should run, in what order, and with what data. This prevents conflicts and race conditions while enabling more sophisticated discount combinations and cleaner debugging workflows.</p>
+
+      <p>Each handler works independently but coordinates through a central coordinator that decides execution order and passes data forward.</p>
+
+      <h3>Technical Challenges</h3>
+      
+      <p><strong>Mathematical Precision:</strong> Ensuring proportional discount allocation across mixed cart items (percentage vs. fixed amounts) while maintaining subtotal accuracy. When distributing a 15% discount across items with different prices, simple proportional math creates rounding errors. Solved with a two-pass algorithm that reconciles remainders.
+      </p>
+
+      <p><strong>Complex Combinations:</strong> When multiples (3-for-2, 4-for-3) combine with percentage discounts, the system must identify which items are free, allocate the percentage discount only to paid items, and display both discount types clearly. This is difficult to represent natively in the cart. Shopify applies automatic discounts only at checkout level—the cart has no native way to preview them. Meanwhile, manual discount codes are handled at the cart level. Rebuy (the third-party cart system) is UI-only and can't enforce discount logic itself. This creates a gap: customers see one price in the cart, a different price at checkout, with no explanation. The system must detect which discount type is active, where it's being applied (cart vs. checkout), and coordinate the display across incompatible systems so the cart preview matches checkout reality.
+      </p>
+
+      <p><strong>Debugging at Scale:</strong> The system handles 7+ discount types in combination across 8 storefronts with different configurations. Built extensive debug logging that can be enabled via browser console, providing real-time visibility into state changes and calculations.
+      </p>
 
       <h3>Impact</h3>
       <ul>
-        <li><strong>Improved Trust:</strong> Marketing links show correct prices pre-checkout</li>
-        <li><strong>International Deployment </strong>across multiple storefronts; configurable per region.</li>
-        <li><strong>Operational Efficiency:</strong> Reduced cart-related support tickets for customer service team, thanks to clear, truthful cart totals</li>
-        <li><strong>Marketing Enablement:</strong> Enabled complex promotional campaigns</li>
-        <li><strong>Customer Experience:</strong> Maintained customer trust through consistent cart-to-checkout pricing across international markets</li>
+        <li><strong>Consistency:</strong> Cart totals now match checkout—eliminated the largest source of support tickets</li>
+        <li><strong>International Scale:</strong> Deployed across 8 storefronts with multi-currency, multi-language support</li>
+        <li><strong>Complex Scenarios:</strong> System handles 7+ discount types in combination without breaking</li>
+        <li><strong>Performance:</strong> Optimized for high-frequency cart updates with intelligent change detection</li>
+        <li><strong>Trust:</strong> Customers see accurate, truthful pricing at every step</li>
       </ul>
 
-      <h3>Key Technical Learning</h3>
-        <p>Sometimes the best engineering solution works around platform constraints rather than fighting them - building coordination layers often delivers better results than trying to force different systems to communicate natively.</p>
+      <h3>What I Learned</h3>
+      <p>Sometimes the best engineering isn't about forcing incompatible systems to talk—it's about building a coordination layer that works <em>with</em> platform constraints rather than against them. Discovering that certain discount types are managed at checkout level meant I could stop trying to fully replicate that logic and instead focus on providing accurate preview prices for scenarios the platform doesn't handle natively.</p>
 
-      <h3>What I’ll Do Next</h3>
+      <h3>Future Improvements</h3>
       <ul>
-        <li>Finish Coordinator refactor; extract allocation/formatting into reusable utils.</li>
-        <li>Add configurable selectors so it’s Rebuy-aware, not Rebuy-locked.</li>
-        <li>Companion Shopify Functions to enforce rules at checkout where needed.</li>
+        <li>Abstract platform-specific integrations for broader applicability</li>
+        <li>Develop standardized interfaces for different cart systems</li>
+        <li>Create adapter patterns for use across multiple platforms</li>
       </ul>
 
       <div class="project-links" style="margin-top:1.25rem">
-        <a href="https://github.com/yourusername/discount-system-docs" class="btn">Technical Docs</a>
-        <a href="files/Ian Fleming Resume 2025.pdf" class="btn btn--ghost" target="_blank">Download Resume</a>
+        <a href="https://github.com/ianfleming464/cart-discount-coordination-engine-documentation" class="btn">Technical Docs</a>
+        <a href="files/Ian_Fleming_Resume.pdf" class="btn btn--ghost" target="_blank">Download Resume</a>
         <a href="index.html#work" class="btn btn--ghost">Back to Work</a>
       </div>
     </div>
@@ -123,8 +125,8 @@
         <ul class="bullets-tight">
           <li>Lead developer</li>
           <li>Frontend JS + cart UX</li>
-          <li>Rebuy integration</li>
-          <li>Theme/Liquid work</li>
+          <li>Multi-platform deployment</li>
+          <li>Architecture design</li>
         </ul>
       </div>
 
@@ -132,23 +134,21 @@
         <h4>Stack</h4>
         <ul class="bullets-tight">
           <li>JavaScript (ES6+)</li>
-          <li>Liquid · DOM APIs</li>
-          <li>Rebuy Smart Cart</li>
-          <li>Metafields, cookies</li>
+          <li>DOM APIs</li>
+          <li>Event-driven architecture</li>
+          <li>Mathematical algorithms</li>
         </ul>
       </div>
 
       <div class="side-card">
-        <h4>Constraints</h4>
-        <ul class="small">
-          <li><strong>Discount Detection:</strong> Data accessibility varies unpredictably between Shopify and Rebuy APIs depending on discount type and application method</li>
-          <li><strong>Mathematical Precision:</strong> Rounding conflicts between cart-total and item-level allocation occasionally create 1-cent discrepancies in large carts</li>
-          <li><strong>Platform Dependencies:</strong> DOM selector fragility means third-party updates can break functionality without warning</li>
-          <li><strong>Race Conditions:</strong> Timing coordination required between multiple platform update cycles</li>
-          <li><strong>International Complexity:</strong> Currency formatting, browser compatibility, and general different theme setups across markets</li>
-          <li><strong>Line Item Behaviour:</strong> Shopify's unpredictable split/merge logic disrupts grouping assumptions</li>
+        <h4>Key Patterns</h4>
+        <ul class="bullets-tight">
+          <li>Proportional allocation algorithms</li>
+          <li>State signature tracking</li>
+          <li>Platform-aware mode detection</li>
+          <li>Event coordination</li>
+          <li>Multi-currency formatting</li>
         </ul>
-        <p class="small">System designed to fail-safe to native behaviour when constraints create conflicts; true discount enforcement belongs at checkout level.</p>
       </div>
     </aside>
   </section>
